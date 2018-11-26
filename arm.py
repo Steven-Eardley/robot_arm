@@ -3,6 +3,7 @@ import sys
 import time
 import RPi.GPIO as GPIO
 import curses
+from multiprocessing import Process
 
 # Use BCM GPIO references instead of physical pin numbers
 GPIO.setmode(GPIO.BCM)
@@ -30,7 +31,8 @@ class ArmStepperMotor(object):
     clockwise = True
     next_step_index = 0
     seq = None
-    step_delay = 0.01                                          # 10ms in seconds
+    step_delay = 0
+    halt = False
 
     def __init__(self, pins, clockwise=True, step_delay=10, **kwargs):
         self.pins = pins
@@ -42,7 +44,7 @@ class ArmStepperMotor(object):
             self.seq = [list(zip(self.pins, s)) for s in STEPSEQ]
         else:
             self.seq = [list(zip(self.pins, s)) for s in reversed(STEPSEQ)]
-        self.step_delay = step_delay / 1000.00
+        self.step_delay = step_delay / float(1000)
 
     def step(self, forwards=True):
         # Apply the next step instruction to the motor controller
@@ -59,9 +61,16 @@ class ArmStepperMotor(object):
         elif self.next_step_index < 0:
             self.next_step_index = len(self.seq) - 1
 
-    def stop(self):
-        [GPIO.output(pin, bool(sig)) for (pin, sig) in zip(self.pins, OFF)]
+    def spin(self, forwards=True):
+        while self.halt is False:
+            self.step(forwards=forwards)
+        self.halt = False
 
+    def stop(self):
+        self.halt = True
+        global OFF
+        [GPIO.output(pin, bool(sig)) for (pin, sig) in list(zip(self.pins, OFF))]
+        self.halt = False
 m1 = ArmStepperMotor(ROTPINS, clockwise=False)
 m2 = ArmStepperMotor(SH1PINS)
 m3 = ArmStepperMotor(SH2PINS)
@@ -69,6 +78,7 @@ m3 = ArmStepperMotor(SH2PINS)
 
 def main(screen):
     screen.nodelay(True)
+    curses.echo()
     key = ''
     while key != 'q':
         try:
@@ -77,13 +87,21 @@ def main(screen):
             pass  # no keypress was ready
         else:
             if key == 'KEY_LEFT':
-                m1.step()
+                m1.stop()
+                mv = Process(m1.spin, (False,))
+                mv.start()
             elif key == 'KEY_RIGHT':
-                m1.step(forwards=False)
+                m1.stop()
+                mv = Process(m1.spin)
+                mv.start()
             elif key == 'KEY_UP':
-                m2.step()
-            elif key == 'KEY_DOWN':
                 m2.step(forwards=False)
+            elif key == 'KEY_DOWN':
+                m2.step()
+            elif key == 'SPACE':
+                m1.stop()
+                m2.stop()
+                mv.join()
 
 
 if __name__ == '__main__':
