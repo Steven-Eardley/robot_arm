@@ -2,7 +2,7 @@
 import sys
 import time
 import RPi.GPIO as GPIO
-import pygame
+import curses
 
 # Use BCM GPIO references instead of physical pin numbers
 GPIO.setmode(GPIO.BCM)
@@ -30,8 +30,9 @@ class ArmStepperMotor(object):
     clockwise = True
     next_step_index = 0
     seq = None
+    step_delay = 0.01                                          # 10ms in seconds
 
-    def __init__(self, pins, clockwise=True, **kwargs):
+    def __init__(self, pins, clockwise=True, step_delay=10, **kwargs):
         self.pins = pins
         for p in self.pins:
             GPIO.setup(p, GPIO.OUT)
@@ -41,10 +42,12 @@ class ArmStepperMotor(object):
             self.seq = [list(zip(self.pins, s)) for s in STEPSEQ]
         else:
             self.seq = [list(zip(self.pins, s)) for s in reversed(STEPSEQ)]
+        self.step_delay = step_delay / 1000.00
 
     def step(self, forwards=True):
         # Apply the next step instruction to the motor controller
         [GPIO.output(pin, bool(sig)) for (pin, sig) in self.seq[self.next_step_index]]
+        time.sleep(self.step_delay)
         if forwards:
             self.next_step_index += 1
         else:
@@ -63,35 +66,25 @@ m1 = ArmStepperMotor(ROTPINS, clockwise=False)
 m2 = ArmStepperMotor(SH1PINS)
 m3 = ArmStepperMotor(SH2PINS)
 
-m1_on = False
-pygame.init()
-clock = pygame.time.Clock()
-while True:
-    m1.step(forwards=False)
-    clock.tick(100)
-    """
-    keys = pygame.key.get_pressed()
-    if keys[pygame.K_LEFT]:
-        print("left")
-        m1.step()
-    if keys[pygame.K_RIGHT]:
-        print("right")
-        m1.step(forwards=False)
-    if keys[pygame.K_ESCAPE]:
-        m1.stop()
-        exit(0)
-    for event in pygame.event.get():
-        if m1_on:
-            m1.step()
+
+def main(screen):
+    screen.nodelay(True)
+    key = ''
+    while key != 'q':
+        try:
+            key = screen.getkey()
+        except curses.error:
+            pass  # no keypress was ready
         else:
-            m1.stop()
-        if event.type == pygame.QUIT:
-            m1.stop()
-            exit(0)
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_LEFT:
-                m1_on = True
-        if event.type == pygame.KEYUP:
-            if event.key == pygame.K_LEFT:
-                m1_on = False
-    """
+            if key == 'KEY_LEFT':
+                m1.step()
+            elif key == 'KEY_RIGHT':
+                m1.step(forwards=False)
+            elif key == 'KEY_UP':
+                m2.step()
+            elif key == 'KEY_DOWN':
+                m2.step(forwards=False)
+
+
+if __name__ == '__main__':
+    curses.wrapper(main)
