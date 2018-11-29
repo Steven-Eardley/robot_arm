@@ -2,8 +2,8 @@
 import sys
 import time
 import RPi.GPIO as GPIO
-import curses
-import threading
+import pygame
+from pygame.locals import *
 
 # Use BCM GPIO references instead of physical pin numbers
 GPIO.setmode(GPIO.BCM)
@@ -71,32 +71,35 @@ class ArmStepperMotor(object):
         global OFF
         [GPIO.output(pin, bool(sig)) for (pin, sig) in list(zip(self.pins, OFF))]
         self.halt = False
-m1 = ArmStepperMotor(ROTPINS, clockwise=False)
-m2 = ArmStepperMotor(SH1PINS)
-m3 = ArmStepperMotor(SH2PINS)
-
-def input_thread(screen):
-    curses.echo()
-    key = ''
-    while key != 'q':
-        try:
-            key = screen.getkey()
-        except curses.error:
-            pass  # no keypress was ready
-        else:
-            if key == 'KEY_LEFT':
-                m1.stop()
-                m1.spin(forwards=False)
-            elif key == 'KEY_RIGHT':
-                m1.stop()
-                m1.spin()
-
-def main(screen):
-    screen.nodelay(True)
-    t = threading.Thread(name='arm_imput', target=input_thread, args=(screen,))
-    t.setDaemon(True)
-    t.start()
-
 
 if __name__ == '__main__':
-    curses.wrapper(main)
+    m1 = ArmStepperMotor(ROTPINS, clockwise=False)
+    m2 = ArmStepperMotor(SH1PINS)
+    m3 = ArmStepperMotor(SH2PINS, clockwise=False)
+
+    pygame.init()
+    pygame.display.set_mode((1, 1))
+    clock = pygame.time.Clock()
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit();
+                exit(0)
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_LEFT:
+                    m1.step(forwards=False)
+                elif event.key == pygame.K_RIGHT:
+                    m1.step()
+                elif event.key == pygame.K_UP:
+                    m2.step(forwards=False)
+                elif event.key == pygame.K_DOWN:
+                    m2.step()
+                elif event.key == pygame.K_COMMA:
+                    m3.step(forwards=False)
+                elif event.key == pygame.K_PERIOD:
+                    m3.step()
+                elif event.key == pygame.K_ESCAPE:
+                    pygame.quit();
+                    exit(0)
+
+        clock.tick(10)
