@@ -78,6 +78,7 @@ if __name__ == '__main__':
     m3 = ArmStepperMotor(SH2PINS, clockwise=False)
 
     pygame.init()
+    pygame.key.set_repeat(0, 10)
     pygame.display.set_mode((1, 1))
     clock = pygame.time.Clock()
     while True:
