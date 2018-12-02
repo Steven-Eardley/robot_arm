@@ -3,7 +3,7 @@
 
 import time
 import threading
-from getch import getch
+import curses
 
 halt = False
 input_queue = []
@@ -41,11 +41,9 @@ def slow2():
             return
 
 
-def input_thread(q):
+def input_thread(q, screen):
     while True:
-        key = getch()
-        print(key)
-        q.append(key)
+        q.append(screen.getkey())
         time.sleep(0.1)
 
 
@@ -59,8 +57,10 @@ fn_map = {
     'x': stop,
 }
 
-if __name__ == '__main__':
-    t = threading.Thread(name='arm_imput', target=input_thread, args=(input_queue,))
+def main(screen):
+    #screen.nodelay(True)
+    curses.echo()
+    t = threading.Thread(name='arm_imput', target=input_thread, args=(input_queue, screen,))
     t.setDaemon(True)
     t.start()
 
@@ -69,7 +69,13 @@ if __name__ == '__main__':
             k = input_queue.pop()
             if k in fn_map:
                 halt = True            # On new valid input, stop current action
+                time.sleep(2)
             fn_map[k]()
+            print(f"POPPED {k}")
         except (IndexError, KeyError):
             # Wait for input
             time.sleep(0.1)
+
+
+if __name__ == '__main__':
+    curses.wrapper(main)
